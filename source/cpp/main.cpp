@@ -26,7 +26,7 @@ int main()
 
 	/* 各種パラメータ */
 	int numrcv;
-	char buffer[BUFFER_SIZE]; //送られてくるデータ内容
+	//char buffer[BUFFER_SIZE]; //送られてくるデータ内容
 
 	/************************************************************/
 	/* Windows 独自の設定 */
@@ -59,7 +59,7 @@ int main()
 
 
 
-	//----------------------------マッチング
+	//----------------------------マッチング信号　ステップ1
 	bool ChkMatch = false;
 	bool ChkConnect[CONNECT_MAX] = { false };
 	int ConnectOK = 0;
@@ -68,47 +68,40 @@ int main()
 	{
 		for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 		{
+			char ConnectRMsg[BUFFER_SIZE]; //送られてくるデータ内容
+			ConnectRMsg[0] = NULL;
 			//接続が確立されていない
 			if (ChkConnect[ConnectCnt] == false)
 			{
 				dstSocket[ConnectCnt] = accept(srcSocket, (struct sockaddr *) &dstAddr, &dstAddrSize);
 				char addr[80] = { NULL };
 				inet_ntop(AF_INET, &dstAddr[ConnectCnt].sin_addr, addr, dstAddrSize);
-				//printf("Connected from %s\n", addr);
+				sprintf_s(addr, "%s%d", addr, ConnectCnt);
+				printf("from %s\n", addr);
 				/* パケット受信 */
-				numrcv = recv(dstSocket[ConnectCnt], buffer, BUFFER_SIZE, 0);
+				numrcv = recv(dstSocket[ConnectCnt], ConnectRMsg, BUFFER_SIZE, 0);
 				if (numrcv < 1)
 				{
 					if (WSAGetLastError() == WSAEWOULDBLOCK)
 					{
 						// まだ来ない。
-						printf("MADA KONAI\n");
+						//printf("MADA KONAI\n");
 					}
 					else
 					{
-						printf("error : 0x%x\n", WSAGetLastError());
+						//printf("error : 0x%x\n", WSAGetLastError());
 					}
 				}
 				else
 				{
 					ChkConnect[ConnectCnt] = true;
 					printf("received data\n");
-					printf("%s\n", buffer);
+					printf("%s\n", ConnectRMsg);
 					//コネクト数をカウントして4になると全員の接続が完了
 					ConnectOK++;
 					//マッチング待ち(人数待ち)を相手に送る
 					sprintf_s(toSendText, "%d", ConnectOK);
 					send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
-					if (ConnectOK == 4)
-					{
-						ChkMatch = true;
-						printf("4人マッチング完了\n");
-						sprintf_s(toSendText, "%d", ConnectOK);
-						for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
-						{
-							send(dstSocket[Cnt], toSendText, strlen(toSendText) + 1, 0);
-						}
-					}
 				}
 			}
 			//接続が確立されてる
@@ -118,22 +111,91 @@ int main()
 				sprintf_s(toSendText, "%d", ConnectOK);
 				send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
 			}
-			// とりあえず一秒待ってみる
-			Sleep(1000);
+			if (ConnectOK == CONNECT_MAX)
+			{
+				ChkMatch = true;
+				printf("4人マッチング完了\n");
+				//人数にが揃ったら5を送ってマッチング確定合図とする
+				sprintf_s(toSendText, "%d", 5);
+				for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
+				{
+					send(dstSocket[Cnt], toSendText, strlen(toSendText) + 1, 0);
+				}
+			}
+			// とりあえず待ってみる
+			Sleep(100);
 		}
 	}
-	//----------------------------マッチング
+	//----------------------------マッチング信号
 
 
-
-
-	//----------------------------ゲーム開始
-	bool ChkGame = false;
-	while (ChkGame != true)
+	//----------------------------個人番号信号　ステップ2
+	bool ChkMyNum = false;
+	bool ChkMyNumRecv[CONNECT_MAX] = { false };
+	int MyNumOK = 0;
+	while (ChkMyNum != true)
 	{
 		for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 		{
-			numrcv = recv(dstSocket[ConnectCnt], buffer, BUFFER_SIZE, 0);
+			char MyNumChkRMsg[BUFFER_SIZE]; //送られてくるデータ内容
+			MyNumChkRMsg[0] = NULL;
+			if (ChkMyNumRecv[ConnectCnt] == true) continue;
+			//個人番号合図を送る
+			sprintf_s(toSendText, "MyNum%d", ConnectCnt);
+			send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
+			numrcv = recv(dstSocket[ConnectCnt], MyNumChkRMsg, BUFFER_SIZE, 0);
+			if (numrcv < 1)
+			{
+				if (WSAGetLastError() == WSAEWOULDBLOCK)
+				{
+					// まだ来ない。
+					//printf("MADA KONAI\n");
+				}
+				else
+				{
+					//printf("error : 0x%x\n", WSAGetLastError());
+				}
+			}
+			else
+			{
+				if (strcmp(MyNumChkRMsg, "OK") == 0)
+				{
+					//個人番号を受けっとた合図が返ってきたらここでカウント増やす
+					ChkMyNumRecv[ConnectCnt] = true;
+					MyNumOK++;
+					//みんな確認取れたら次のステップへ
+					if (MyNumOK >= CONNECT_MAX) ChkMyNum = true;
+				}
+				char addr[80] = { NULL };
+				inet_ntop(AF_INET, &dstAddr[ConnectCnt].sin_addr, addr, dstAddrSize);
+				sprintf_s(addr, "%s%d", addr, ConnectCnt);
+				printf("from %s\n", addr);
+				printf("%s\n", MyNumChkRMsg);
+			}
+			// とりあえず待ってみる
+			Sleep(100);
+		}
+	}
+	//----------------------------個人番号信号
+
+
+
+	//----------------------------カウントダウンスタート信号　ステップ3
+	//カウントダウン開始の合図を送る
+	bool ChkStart = false;
+	bool ChkStartRecv[CONNECT_MAX] = { false };
+	int StartOK = 0;
+	while (ChkStart != true)
+	{
+		for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
+		{
+			char CountChkRMsg[BUFFER_SIZE]; //送られてくるデータ内容
+			CountChkRMsg[0] = NULL;
+			if (ChkStartRecv[ConnectCnt] == true) continue;
+			//個人番号合図を送る
+			sprintf_s(toSendText, "Start");
+			send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
+			numrcv = recv(dstSocket[ConnectCnt], CountChkRMsg, BUFFER_SIZE, 0);
 			if (numrcv < 1)
 			{
 				if (WSAGetLastError() == WSAEWOULDBLOCK)
@@ -144,25 +206,63 @@ int main()
 				else
 				{
 					printf("error : 0x%x\n", WSAGetLastError());
+				}
+			}
+			else
+			{
+				if (strcmp(CountChkRMsg, "OK") == 0)
+				{
+					//個人番号を受けっとた合図が返ってきたらここでカウント増やす
+					ChkStartRecv[ConnectCnt] = true;
+					StartOK++;
+					//みんな確認取れたら次のステップへ
+					if (StartOK >= CONNECT_MAX) ChkMyNum = true;
+				}
+				printf("ゲーム開始\n");
+				printf("%s\n", CountChkRMsg);
+			}
+		}
+	}
+	//----------------------------カウントダウンスタート信号
+
+
+
+
+	//----------------------------ゲーム中信号　ステップ4
+	//ゲームが終わるまでループ
+	bool ChkGameEnd = false;
+	while (ChkGameEnd != true)
+	{
+		for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
+		{
+			char GameRMsg[BUFFER_SIZE]; //送られてくるデータ内容
+			GameRMsg[0] = NULL;
+			//カウントダウン開始の合図を送る
+			sprintf_s(toSendText, "Start");
+			//send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
+			numrcv = recv(dstSocket[ConnectCnt], GameRMsg, BUFFER_SIZE, 0);
+			if (numrcv < 1)
+			{
+				if (WSAGetLastError() == WSAEWOULDBLOCK)
+				{
+					// まだ来ない。
+					//printf("MADA KONAI\n");
+				}
+				else
+				{
+					//printf("error : 0x%x\n", WSAGetLastError());
 					break;
 				}
 			}
 			else
 			{
-				printf("received data\n");
-				printf("%s\n", buffer);
+				//printf("received data\n");
+				//printf("%s\n", buffer);
 				break;
 			}
 		}
 	}
-	//----------------------------ゲーム開始
-
-
-
-
-
-
-
+	//----------------------------ゲーム中信号
 
 
 
