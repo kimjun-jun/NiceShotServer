@@ -6,7 +6,7 @@
 #pragma comment (lib, "Ws2_32.lib")
 
 #define BUFFER_SIZE 256
-#define CONNECT_MAX 4
+#define CONNECT_MAX 2
 
 //STEP1	同端末通信	OK
 //STEP2	LAN通信		OK
@@ -201,11 +201,11 @@ int main()
 				if (WSAGetLastError() == WSAEWOULDBLOCK)
 				{
 					// まだ来ない。
-					printf("MADA KONAI\n");
+					//printf("MADA KONAI\n");
 				}
 				else
 				{
-					printf("error : 0x%x\n", WSAGetLastError());
+					//printf("error : 0x%x\n", WSAGetLastError());
 				}
 			}
 			else
@@ -216,7 +216,7 @@ int main()
 					ChkStartRecv[ConnectCnt] = true;
 					StartOK++;
 					//みんな確認取れたら次のステップへ
-					if (StartOK >= CONNECT_MAX) ChkMyNum = true;
+					if (StartOK >= CONNECT_MAX) ChkStart = true;
 				}
 				printf("ゲーム開始\n");
 				printf("%s\n", CountChkRMsg);
@@ -235,12 +235,11 @@ int main()
 	{
 		for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 		{
-			char GameRMsg[BUFFER_SIZE]; //送られてくるデータ内容
-			GameRMsg[0] = NULL;
-			//カウントダウン開始の合図を送る
-			sprintf_s(toSendText, "Start");
-			//send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
+			char GameRMsg[BUFFER_SIZE] = { NULL }; //送られてくるデータ内容
+
+			//メッセージを受け取る
 			numrcv = recv(dstSocket[ConnectCnt], GameRMsg, BUFFER_SIZE, 0);
+			//numrcv = -1;
 			if (numrcv < 1)
 			{
 				if (WSAGetLastError() == WSAEWOULDBLOCK)
@@ -251,14 +250,21 @@ int main()
 				else
 				{
 					//printf("error : 0x%x\n", WSAGetLastError());
-					break;
 				}
 			}
 			else
 			{
+				//データが送られてきたら他クライアントにデータを送信
+				for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
+				{
+					if (SendCnt == ConnectCnt)
+					{
+						continue; //自分には送らなくていい
+					}
+					send(dstSocket[SendCnt], GameRMsg, strlen(GameRMsg) + 1, 0);
+				}
 				//printf("received data\n");
 				//printf("%s\n", buffer);
-				break;
 			}
 		}
 	}
