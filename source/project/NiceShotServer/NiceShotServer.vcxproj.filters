@@ -24,5 +24,13 @@
     <ClCompile Include="..\..\cpp\main.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\cpp\vec3.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\h\vec3.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
