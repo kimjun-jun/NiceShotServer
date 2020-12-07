@@ -19,10 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\cpp\library.cpp" />
     <ClCompile Include="..\..\cpp\main.cpp" />
     <ClCompile Include="..\..\cpp\vec3.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\h\library.h" />
     <ClInclude Include="..\..\h\vec3.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

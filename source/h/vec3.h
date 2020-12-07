@@ -9,6 +9,16 @@ struct VEC3
 	float x;
 	float y;
 	float z;
+
+	//比較演算子オーバーロード
+	inline bool operator==(const VEC3& pMy)
+	{
+		if (x == pMy.x && y == pMy.y && z == pMy.z)
+		{
+			return true;
+		}
+		return false;
+	}
 };
 
 /**

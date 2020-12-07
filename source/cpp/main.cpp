@@ -3,7 +3,9 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <string.h>
+#include <math.h>
 #include"../h/vec3.h"
+#include "../h/library.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
@@ -14,14 +16,27 @@
 #define DROP_ITEM_MAX 20
 #define ITEM_RESPOWNTIMEMAX 9600000
 
-#define	ITEM_INIT_POSX						(700.0f)																	//!< 初期座標アイテム
-#define	ITEM_INIT_POSY						(500.0f)																	//!< 初期座標アイテム
-#define	ITEM_INIT_POSZ						(700.0f)																	//!< 初期座標アイテム
-#define	WALL_INIT_POSX						(2600.0f)																	//!< 初期座標壁
-#define	WALL_INIT_POSY						(0.0f)																		//!< 初期座標壁
-#define	WALL_INIT_POSZ						(2600.0f)																	//!< 初期座標壁
-#define	WALL_SIZE_X							(WALL_INIT_POSX*2)															//!< 壁のサイズX
-#define	WALL_SIZE_Y							(800.0f)																	//!< 壁のサイズY
+#define	ITEM_INIT_POSX						(700.0f)						//!< 初期座標アイテム
+#define	ITEM_INIT_POSY						(500.0f)						//!< 初期座標アイテム
+#define	ITEM_INIT_POSZ						(700.0f)						//!< 初期座標アイテム
+#define	WALL_INIT_POSX						(2600.0f)						//!< 初期座標壁
+#define	WALL_INIT_POSY						(0.0f)							//!< 初期座標壁
+#define	WALL_INIT_POSZ						(2600.0f)						//!< 初期座標壁
+#define	WALL_SIZE_X							(WALL_INIT_POSX*2)				//!< 壁のサイズX
+#define	WALL_SIZE_Y							(800.0f)						//!< 壁のサイズY
+
+#define	NUM_VERTEX_MAX						(1089)						//!< 壁のサイズY
+#define	NUM_VERTEX_INDEX_MAX				(2172)						//!< 壁のサイズY
+#define	NUM_POLYGON_MAX						(2172)						//!< 壁のサイズY
+#define	NUM_BLOCK_FIELD_MAX					(32)						//!< 壁のサイズY
+#define	SIZE_BLOCK_FIELD					(250.0f)						//!< 壁のサイズY
+
+#define	SIZE_BLOCK_MAX						(8000)						//!< 壁のサイズY
+#define	SIZE_BLOCK_HALF						(4000)						//!< 壁のサイズY
+#define	SIZE_BLOCK_QUARTER					(2000)						//!< 壁のサイズY
+#define	SIZE_BLOCK_EIGHTH					(1000)						//!< 壁のサイズY
+
+#define	OBJECT_PLAYER_MAX					(4)						//!< 壁のサイズY
 
 enum
 {
@@ -39,11 +54,13 @@ enum
 //STEP2	LAN通信		OK
 //STEP3	WAN通信		OK
 
+void GenerateFiled(VEC3 *PPOS, VEC3 *VTX, int IGetPlayer, DWORD *pIdx, bool *Tikei, int *IdxMsgBuff);
 
 
 int main()
 {
 	srand((unsigned)time(NULL));
+	srand((unsigned)2);
 
 	//使用中のアイテム数
 	int ItemCntUse = 0;
@@ -51,10 +68,64 @@ int main()
 	bool ItemScyncUse[DROP_ITEM_MAX];
 	float ItemRespownTime = 0.0f;
 
+	//プレイヤー座標 
+	VEC3 PlayerPos[CONNECT_MAX];
+
+	//地形生成に必要なデータ
+	VEC3 VTXPos[NUM_VERTEX_MAX];	//地形座標
+	int TikeiItemGetPlayer = -1;	//地形アイテムを取得したプレイヤー番号
+	bool TikeiChange = false;		//trueの時地形生成
+	DWORD FieldIdx[NUM_VERTEX_INDEX_MAX];	//地形頂点のインデックス
+	int TikeiIdxMsgBuff[NUM_VERTEX_MAX / 2] = { -1 };	//メッセージする頂点インデックスのバッファ
+
 	while (1)
 	{
+		//初期化
 		for (int i = 0; i < DROP_ITEM_MAX; i++) ItemUse[i] = true;
 		for (int i = 0; i < DROP_ITEM_MAX; i++) ItemScyncUse[i] = true;
+		ItemRespownTime = 0.0f;
+		for (int i = 0; i < CONNECT_MAX; i++)
+		{
+			PlayerPos[i].x = 0.0f;
+			PlayerPos[i].y = 0.0f;
+			PlayerPos[i].z = 0.0f;
+		}
+		for (int ix = 0; ix < NUM_BLOCK_FIELD_MAX+1; ix++)
+		{
+			for (int iz = 0; iz < NUM_BLOCK_FIELD_MAX + 1; iz++)
+			{
+				VTXPos[iz * (NUM_BLOCK_FIELD_MAX + 1) + ix].x = -(NUM_BLOCK_FIELD_MAX / 2.0f) * SIZE_BLOCK_FIELD + ix * SIZE_BLOCK_FIELD;
+				VTXPos[iz * (NUM_BLOCK_FIELD_MAX + 1) + ix].y = 0.0f;
+				VTXPos[iz * (NUM_BLOCK_FIELD_MAX + 1) + ix].z = (NUM_BLOCK_FIELD_MAX / 2.0f) * SIZE_BLOCK_FIELD - iz * SIZE_BLOCK_FIELD;
+			}
+		}
+		TikeiItemGetPlayer = -1;
+		TikeiChange = false;
+
+		//頂点バッファインデックスの設定
+		int nCntIdx = 0;
+		for (int nCntVtxZ = 0; nCntVtxZ < NUM_BLOCK_FIELD_MAX; nCntVtxZ++)
+		{
+			if (nCntVtxZ > 0)
+			{// 縮退ポリゴンのためのダブりの設定
+				FieldIdx[nCntIdx] = (nCntVtxZ + 1) * (NUM_BLOCK_FIELD_MAX + 1);
+				nCntIdx++;
+			}
+
+			for (int nCntVtxX = 0; nCntVtxX < (NUM_BLOCK_FIELD_MAX + 1); nCntVtxX++)
+			{
+				FieldIdx[nCntIdx] = (nCntVtxZ + 1) * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX;
+				nCntIdx++;
+				FieldIdx[nCntIdx] = nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX;
+				nCntIdx++;
+			}
+
+			if (nCntVtxZ < (NUM_BLOCK_FIELD_MAX - 1))
+			{// 縮退ポリゴンのためのダブりの設定
+				FieldIdx[nCntIdx] = nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + NUM_BLOCK_FIELD_MAX;
+				nCntIdx++;
+			}
+		}
 
 
 		/* ポート番号、ソケット */
@@ -415,11 +486,16 @@ int main()
 									//データを格納
 									int iIndex = atoi(Index);
 									int iType = atoi(Type);
-									//地形アイテムだったら新頂点座標を生成
+
+									//地形アイテムだったら新頂点座標を生成　サーバーで地形生成するときはこっち使う
+									/*
 									if (iType == ITEMTYPE_TIKEI)
 									{
-
+										//アイテムを取得したプレイヤー番号を記憶
+										TikeiChange = true;
+										TikeiItemGetPlayer = ConnectCnt;
 									}
+									*/
 
 									//ゲットされたアイテムをfalseにしてリスポーンカウントアップ開始
 									if (ItemUse[iIndex] != false)
@@ -479,6 +555,54 @@ int main()
 								if (SendCnt == ConnectCnt) continue; //自分には送らなくていい
 								send(dstSocket[SendCnt], GameRMsg, strlen(GameRMsg) + 1, 0);
 							}
+
+							RMsgBlock = strtok_s(NULL, ",", &next);
+
+							//Posがある場合　バッファを保存
+							if (strcmp(RMsgBlock, "Pos") == 0)
+							{
+								RMsgBlock = strtok_s(NULL, "&", &next);
+								VEC3 buff;
+								char *XYZnext = RMsgBlock;
+								for (int CntXYZ = 0; CntXYZ < 3; CntXYZ++)
+								{
+									char *GetVal = NULL;
+									char *SetVal = NULL;
+									char *YZnext = NULL;
+									char *nullp = NULL;
+									//XYZの数値部分を取得する
+									GetVal = strtok_s(XYZnext, ",", &XYZnext);//GetVal=X000.000,Y000.000,Z000.000  next=次のRot
+									if (CntXYZ == 0) SetVal = strtok_s(GetVal, "X", &nullp);//SetVal=000.000 nullp=NULL
+									else if (CntXYZ == 1) SetVal = strtok_s(GetVal, "Y", &nullp);//SetVal=000.000 nullp=NULL
+									else if (CntXYZ == 2) SetVal = strtok_s(GetVal, "Z", &nullp);//SetVal=000.000 nullp=NULL
+									switch (CntXYZ)
+									{
+									case 0:
+										buff.x = strtof(SetVal, NULL);
+										break;
+									case 1:
+										buff.y = strtof(SetVal, NULL);
+										break;
+									case 2:
+										buff.z = strtof(SetVal, NULL);
+										//データを格納
+										PlayerPos[ConnectCnt] = buff;
+										if (next[0] != NULL) RMsgBlock = strtok_s(next, "@P0,", &next);
+										break;
+									}
+								}
+							}
+						}
+
+						//アイテム取得のデータが送られてきたらアイテム管理をする
+						else if (strcmp(RMsgBlock, "@T") == 0)
+						{
+							//Seed値を同期　この信号を送ることで地形生成を行う
+							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
+							{
+								send(dstSocket[SendCnt], GameRMsg, strlen(GameRMsg) + 1, 0);
+							}
+
 						}
 					}
 
@@ -530,8 +654,29 @@ int main()
 					}
 				}
 
-				//マップの更新
+				//マップの更新　サーバーで地形生成をするときに使用
+				//VTXPos　PlayerPos fieldsize itemをとったTikeiItemGetPlayer 
+				if (TikeiChange == true)
+				{
+					GenerateFiled(&PlayerPos[0], &VTXPos[0], TikeiItemGetPlayer, &FieldIdx[0], &TikeiChange,&TikeiIdxMsgBuff[0]);
 
+					char NewTikeiMsg[BUFFER_SIZE*50] = { NULL }; //新しい地形の頂点座標をメッセージ化したもの
+
+					//メッセージを短くするため高さ決定回数を/2して、計算などは行わずに変更のあった頂点IndxとY数値をメッセージに入れる
+					for (int nCntVtx = 0; nCntVtx < int(NUM_VERTEX_MAX)/2; nCntVtx++)
+					{
+							char NewSMsg[BUFFER_SIZE] = { NULL }; //送るデータ内容　"@Item,%d,%d,X%d,Z%d&"
+							sprintf_s(NewSMsg, "@T%d,Y%d&\n"
+								, TikeiIdxMsgBuff[nCntVtx],int(VTXPos[TikeiIdxMsgBuff[nCntVtx]].y));
+							sprintf_s(NewTikeiMsg, "%s%s", NewTikeiMsg, NewSMsg);
+					}
+
+					//データを送信
+					for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
+					{
+						send(dstSocket[SendCnt], NewTikeiMsg, strlen(NewTikeiMsg) + 1, 0);
+					}
+				}
 			}
 		}
 		//----------------------------ゲーム中信号
@@ -541,3 +686,114 @@ int main()
 		WSACleanup();
 	}
 }
+
+
+
+
+
+
+void GenerateFiled(VEC3 *PPOS,VEC3 *VTX,int IGetPlayer,DWORD *pIdx,bool *Tikei,int *IdxMsgBuff)
+{
+	//上限　高さを設定	
+	//メッセージを短くするため高さ決定回数を/2して、計算などは行わずに変更のあった頂点IndxとY数値をメッセージに入れる
+	for (int nCntVtx = 0; nCntVtx < int(NUM_VERTEX_MAX)/2; nCntVtx++)
+	{
+		//高さを決める頂点を決定
+		int YTXrandNum(rand() % NUM_VERTEX_MAX);
+		//高さを決め代入
+		int VTXrandY(rand() % 200);
+		VTXrandY += 20;//オフセット
+		if (VTX[YTXrandNum] == VTX[YTXrandNum + 1])
+		{
+			VTX[YTXrandNum].y = VTX[YTXrandNum + 1].y = float(VTXrandY);
+			IdxMsgBuff[nCntVtx] = YTXrandNum;
+			continue;
+		}
+		else if (VTX[YTXrandNum + 1] == VTX[YTXrandNum + 2])
+		{
+			VTX[YTXrandNum + 1].y = VTX[YTXrandNum + 2].y = float(VTXrandY);
+			IdxMsgBuff[nCntVtx] = YTXrandNum;
+			continue;
+		}
+		VTX[YTXrandNum].y = float(VTXrandY);
+		IdxMsgBuff[nCntVtx] = YTXrandNum;
+	}
+
+	/*
+	//フラクタルアルゴリズム改造版
+	for (int nCntVtxZ = 0; nCntVtxZ < (NUM_BLOCK_FIELD_MAX + 1); nCntVtxZ++)
+	{
+		for (int nCntVtxX = 0; nCntVtxX < (NUM_BLOCK_FIELD_MAX + 1); nCntVtxX++)
+		{
+			//縮退ポリゴンよけなさい
+			if (nCntVtxZ*nCntVtxX == NUM_VERTEX_INDEX_MAX - 2) break;
+			else if (VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX] == VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX + 1])	continue;
+			else if (VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX + 1] == VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX + 2]) continue;
+			// 頂点座標の設定
+			//頂点最端の高さは固定。壁際の頂点のこと。
+			//上側
+			if (nCntVtxZ == 0 || nCntVtxX == 0 || nCntVtxZ == NUM_BLOCK_FIELD_MAX || nCntVtxX == NUM_BLOCK_FIELD_MAX)
+				VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX].y = 200.0f;
+			//中側　上下左右の平均値を算出
+			//隣接頂点の高さの平均値を求め、中心の頂点の高さとする。
+			else
+			{
+				float y = (VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX - 1].y + VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX + 1].y +
+					VTX[(nCntVtxZ - 1) * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX].y + VTX[(nCntVtxZ + 1) * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX].y) / 4.0f;
+				VTX[nCntVtxZ * (NUM_BLOCK_FIELD_MAX + 1) + nCntVtxX].y = fabsf(y);
+			}
+		}
+	}
+
+
+
+	for (int CntPlayer = 0; CntPlayer < CONNECT_MAX; CntPlayer++)
+	{
+		if (CntPlayer != IGetPlayer)
+		{
+			float HitPosUp;
+			float HitPosDown;
+			float HitPosLeft;
+			float HitPosRight;
+			HitPosUp = HitPosDown = HitPosLeft = HitPosRight = 0.0f;
+
+			//プレイヤーの乗っているエリアを特定。4分木で範囲を絞る。
+			//-------------------オブジェクト値読み込み
+			VEC3 pos = PPOS[CntPlayer];
+			SpeedUpFieldHitPoly(pos, &HitPosUp, &HitPosDown, &HitPosLeft, &HitPosRight,
+				SIZE_BLOCK_EIGHTH, SIZE_BLOCK_EIGHTH, SIZE_BLOCK_EIGHTH / 2, SIZE_BLOCK_EIGHTH / 2);
+
+			for (int nCntVtx = 0; nCntVtx < int(NUM_VERTEX_INDEX_MAX); nCntVtx++)
+			{
+				//縮退ポリゴンのときはコンティニュー。最終ポリゴンの時はbreak;
+				if (nCntVtx == NUM_VERTEX_INDEX_MAX - 2)
+				{
+					break;
+				}
+				else if (pIdx[nCntVtx] == pIdx[nCntVtx + 1])
+				{
+					continue;
+				}
+				else if (pIdx[nCntVtx + 1] == pIdx[nCntVtx + 2])
+				{
+					continue;
+				}
+				//高速当たり判定用ポリゴンの座標内なら当たり判定実行　XチェックからZチェック。ともにtrueだと判定
+				if (VTX[pIdx[nCntVtx]].x >= HitPosLeft && VTX[pIdx[nCntVtx]].x <= HitPosRight)
+				{
+					if (VTX[pIdx[nCntVtx]].z <= HitPosUp && VTX[pIdx[nCntVtx]].z >= HitPosDown)
+					{
+						// 頂点座標の設定
+						VTX[pIdx[nCntVtx]].y = 20.0f;
+					}
+				}
+			}
+		}
+	}
+	*/
+
+
+	*Tikei = false;
+}
+
+
