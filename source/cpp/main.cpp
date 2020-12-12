@@ -10,7 +10,7 @@
 #pragma comment (lib, "Ws2_32.lib")
 
 #define BUFFER_SIZE 500
-#define CONNECT_MAX 2
+#define CONNECT_MAX 1
 
 
 #define DROP_ITEM_MAX 20
@@ -60,7 +60,6 @@ void GenerateFiled(VEC3 *PPOS, VEC3 *VTX, int IGetPlayer, DWORD *pIdx, bool *Tik
 int main()
 {
 	srand((unsigned)time(NULL));
-	srand((unsigned)2);
 
 	//使用中のアイテム数
 	int ItemCntUse = 0;
@@ -90,6 +89,7 @@ int main()
 			PlayerPos[i].y = 0.0f;
 			PlayerPos[i].z = 0.0f;
 		}
+		/*
 		for (int ix = 0; ix < NUM_BLOCK_FIELD_MAX+1; ix++)
 		{
 			for (int iz = 0; iz < NUM_BLOCK_FIELD_MAX + 1; iz++)
@@ -99,10 +99,12 @@ int main()
 				VTXPos[iz * (NUM_BLOCK_FIELD_MAX + 1) + ix].z = (NUM_BLOCK_FIELD_MAX / 2.0f) * SIZE_BLOCK_FIELD - iz * SIZE_BLOCK_FIELD;
 			}
 		}
+		*/
 		TikeiItemGetPlayer = -1;
-		TikeiChange = false;
+		//TikeiChange = false;
 
 		//頂点バッファインデックスの設定
+		/*
 		int nCntIdx = 0;
 		for (int nCntVtxZ = 0; nCntVtxZ < NUM_BLOCK_FIELD_MAX; nCntVtxZ++)
 		{
@@ -126,7 +128,7 @@ int main()
 				nCntIdx++;
 			}
 		}
-
+		*/
 
 		/* ポート番号、ソケット */
 		unsigned short port = 27015;
@@ -446,6 +448,7 @@ int main()
 						strcpy_s(GameRMsgBuff, GameRMsg);
 						char *RMsgBlock;
 						char *next = NULL;
+
 						RMsgBlock = strtok_s(GameRMsgBuff, ",", &next);
 
 						//アイテム取得のデータが送られてきたらアイテム管理をする
@@ -603,6 +606,14 @@ int main()
 								send(dstSocket[SendCnt], GameRMsg, strlen(GameRMsg) + 1, 0);
 							}
 
+						}
+
+
+						//終了判定
+						if (strcmp(GameRMsgBuff, "EndGame") == 0)
+						{
+							ChkGameEnd = true;
+							break;
 						}
 					}
 
