@@ -9,12 +9,12 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-#define BUFFER_SIZE 500
-#define CONNECT_MAX 1
+#define BUFFER_SIZE 500					//!< 送信データバッファサイズ
+#define CONNECT_MAX 2					//!< クライアント数
 
 
-#define DROP_ITEM_MAX 20
-#define ITEM_RESPOWNTIMEMAX 9600000
+#define DROP_ITEM_MAX 20				//!< 出現させるアイテムの数
+#define ITEM_RESPOWNTIMEMAX 9600000		//!< アイテムのリスポーンタイム
 
 #define	ITEM_INIT_POSX						(700.0f)						//!< 初期座標アイテム
 #define	ITEM_INIT_POSY						(500.0f)						//!< 初期座標アイテム
@@ -25,18 +25,18 @@
 #define	WALL_SIZE_X							(WALL_INIT_POSX*2)				//!< 壁のサイズX
 #define	WALL_SIZE_Y							(800.0f)						//!< 壁のサイズY
 
-#define	NUM_VERTEX_MAX						(1089)						//!< 壁のサイズY
-#define	NUM_VERTEX_INDEX_MAX				(2172)						//!< 壁のサイズY
-#define	NUM_POLYGON_MAX						(2172)						//!< 壁のサイズY
-#define	NUM_BLOCK_FIELD_MAX					(32)						//!< 壁のサイズY
-#define	SIZE_BLOCK_FIELD					(250.0f)						//!< 壁のサイズY
+#define	NUM_VERTEX_MAX						(1089)						//!< 床メッシュ頂点の数
+#define	NUM_VERTEX_INDEX_MAX				(2172)						//!< 床メッシュインデックスの数
+#define	NUM_POLYGON_MAX						(2172)						//!< 床メッシュポリゴンの数
+#define	NUM_BLOCK_FIELD_MAX					(32)						//!< 床メッシュの縦横ブロック数
+#define	SIZE_BLOCK_FIELD					(250.0f)					//!< 床メッシュの縦横ブロックサイズ
 
-#define	SIZE_BLOCK_MAX						(8000)						//!< 壁のサイズY
-#define	SIZE_BLOCK_HALF						(4000)						//!< 壁のサイズY
-#define	SIZE_BLOCK_QUARTER					(2000)						//!< 壁のサイズY
-#define	SIZE_BLOCK_EIGHTH					(1000)						//!< 壁のサイズY
+#define	SIZE_BLOCK_MAX						(8000)						//!< 床メッシュのサイズ
+#define	SIZE_BLOCK_HALF						(4000)						//!< 床メッシュのサイズ
+#define	SIZE_BLOCK_QUARTER					(2000)						//!< 床メッシュのサイズ
+#define	SIZE_BLOCK_EIGHTH					(1000)						//!< 床メッシュのサイズ
 
-#define	OBJECT_PLAYER_MAX					(4)						//!< 壁のサイズY
+#define	OBJECT_PLAYER_MAX					(4)							//!< プレイヤーの数
 
 enum
 {
