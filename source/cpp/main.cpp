@@ -212,6 +212,8 @@ int main()
 				//接続が確立されていない
 				if (ChkConnect[ConnectCnt] == false)
 				{
+					printf("STEP1 コネクト\n");
+					
 					dstSocket[ConnectCnt] = accept(srcSocket, (struct sockaddr *) &dstAddr, &dstAddrSize);
 					char addr[80] = { NULL };
 					inet_ntop(AF_INET, &dstAddr[ConnectCnt].sin_addr, addr, dstAddrSize);
@@ -219,18 +221,22 @@ int main()
 					printf("from %s\n", addr);
 					/* パケット受信 */
 					numrcv = recv(dstSocket[ConnectCnt], ConnectRMsg, BUFFER_SIZE, 0);
+
+					//データを受け取っていない
 					if (numrcv < 1)
 					{
+						// 非ブロッキングで動作しているので接続確認後receiveを受け取っていないときにここへ来る
 						if (WSAGetLastError() == WSAEWOULDBLOCK)
 						{
-							// まだ来ない。
-							printf("MADA KONAI\n");
+							printf("error : 0x%x\n", WSAGetLastError());
 						}
+						//ひとまずの状態を表示
 						else
 						{
 							printf("error : 0x%x\n", WSAGetLastError());
 						}
 					}
+					//正常にreceiveしているとき
 					else
 					{
 						ChkConnect[ConnectCnt] = true;
@@ -250,11 +256,12 @@ int main()
 					sprintf_s(toSendText, "%d", ConnectOK);
 					send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
 				}
+
+				//人数にが揃ったら確立されたクライアントに5を送ってマッチング確定合図とする
 				if (ConnectOK == CONNECT_MAX)
 				{
 					ChkMatch = true;
-					printf("4人マッチング完了\n");
-					//人数にが揃ったら5を送ってマッチング確定合図とする
+					printf("マッチング完了\n");
 					sprintf_s(toSendText, "%d", 5);
 					for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
 					{
@@ -274,6 +281,7 @@ int main()
 		int MyNumOK = 0;
 		while (ChkMyNum != true)
 		{
+			printf("STEP2 個人番号\n");
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
 				char MyNumChkRMsg[BUFFER_SIZE]; //送られてくるデータ内容
@@ -324,6 +332,7 @@ int main()
 		int ItemOK = 0;
 		while (ChkItem != true)
 		{
+			printf("STEP3 アイテム同期\n");
 			//socketループ
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
@@ -376,6 +385,7 @@ int main()
 		int StartOK = 0;
 		while (ChkStart != true)
 		{
+			printf("STEP4 カウントダウン開始\n");
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
 				char CountChkRMsg[BUFFER_SIZE]; //送られてくるデータ内容
@@ -420,6 +430,7 @@ int main()
 		bool ChkGameEnd = false;
 		while (ChkGameEnd != true)
 		{
+			printf("STEP5 対戦中\n");
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
 				char GameRMsg[BUFFER_SIZE] = { NULL }; //送られてくるデータ内容
