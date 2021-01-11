@@ -10,6 +10,7 @@
 #pragma comment (lib, "Ws2_32.lib")
 
 #define BUFFER_SIZE 500					//!< 送信データバッファサイズ
+#define BUFFER_SIZE_STRING 501					//!< 送信データバッファサイズ
 #define CONNECT_MAX 2					//!< クライアント数
 
 
@@ -71,10 +72,10 @@ int main()
 	VEC3 PlayerPos[CONNECT_MAX];
 
 	//地形生成に必要なデータ
-	VEC3 VTXPos[NUM_VERTEX_MAX];	//地形座標
+	//VEC3 VTXPos[NUM_VERTEX_MAX];	//地形座標
 	int TikeiItemGetPlayer = -1;	//地形アイテムを取得したプレイヤー番号
 	bool TikeiChange = false;		//trueの時地形生成
-	DWORD FieldIdx[NUM_VERTEX_INDEX_MAX];	//地形頂点のインデックス
+	//DWORD FieldIdx[NUM_VERTEX_INDEX_MAX];	//地形頂点のインデックス
 	int TikeiIdxMsgBuff[NUM_VERTEX_MAX / 2] = { -1 };	//メッセージする頂点インデックスのバッファ
 
 	while (1)
@@ -173,7 +174,7 @@ int main()
 		u_long val = 1;
 		ioctlsocket(srcSocket, FIONBIO, &val);
 
-	
+
 		char ItemSMsg[BUFFER_SIZE] = { NULL }; //アイテム情報送るデータ内容
 
 		for (int nCntItem = 0; nCntItem < DROP_ITEM_MAX; nCntItem++)
@@ -202,25 +203,35 @@ int main()
 		bool ChkMatch = false;
 		bool ChkConnect[CONNECT_MAX] = { false };
 		int ConnectOK = 0;
-		char toSendText[1024];
+		char toSendText[BUFFER_SIZE];
+		bool acceptFlag[CONNECT_MAX] = { false,false };
 		while (ChkMatch != true)
 		{
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
 				char ConnectRMsg[BUFFER_SIZE]; //送られてくるデータ内容
+				char addr[80] = { NULL };
 				ConnectRMsg[0] = NULL;
 				//接続が確立されていない
 				if (ChkConnect[ConnectCnt] == false)
 				{
 					printf("STEP1 コネクト\n");
-					
-					dstSocket[ConnectCnt] = accept(srcSocket, (struct sockaddr *) &dstAddr, &dstAddrSize);
-					char addr[80] = { NULL };
+					if (acceptFlag[ConnectCnt] == false)
+					{
+						dstSocket[ConnectCnt] = accept(srcSocket, (struct sockaddr *) &dstAddr, &dstAddrSize);
+
+						if (dstSocket[ConnectCnt] != -1)
+						{
+							acceptFlag[ConnectCnt] = true;
+						}
+					}
+
+					//dstSocket[ConnectCnt] = accept(srcSocket, (struct sockaddr *) &dstAddr, &dstAddrSize);
 					inet_ntop(AF_INET, &dstAddr[ConnectCnt].sin_addr, addr, dstAddrSize);
-					sprintf_s(addr, "%s%d", addr, ConnectCnt);
+					sprintf_s(addr, "%s[%d]", addr, ConnectCnt);
 					printf("from %s\n", addr);
 					/* パケット受信 */
-					numrcv = recv(dstSocket[ConnectCnt], ConnectRMsg, BUFFER_SIZE, 0);
+					numrcv = recv(dstSocket[ConnectCnt], ConnectRMsg, BUFFER_SIZE_STRING, 0);
 
 					//データを受け取っていない
 					if (numrcv < 1)
@@ -233,7 +244,7 @@ int main()
 						//ひとまずの状態を表示
 						else
 						{
-							printf("error : 0x%x\n", WSAGetLastError());
+							printf("応答なし : 0x%x\n", WSAGetLastError());
 						}
 					}
 					//正常にreceiveしているとき
@@ -246,15 +257,18 @@ int main()
 						ConnectOK++;
 						//マッチング待ち(人数待ち)を相手に送る
 						sprintf_s(toSendText, "%d", ConnectOK);
-						send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
+						send(dstSocket[ConnectCnt], toSendText, BUFFER_SIZE_STRING, 0);
 					}
 				}
 				//接続が確立されてる
 				else
 				{
+					inet_ntop(AF_INET, &dstAddr[ConnectCnt].sin_addr, addr, dstAddrSize);
+					sprintf_s(addr, "%s[%d]", addr, ConnectCnt);
+					printf("接続確立　%s\n", addr);
 					//マッチング待ち(人数待ち)を相手に送る
 					sprintf_s(toSendText, "%d", ConnectOK);
-					send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
+					send(dstSocket[ConnectCnt], toSendText, BUFFER_SIZE_STRING, 0);
 				}
 
 				//人数にが揃ったら確立されたクライアントに5を送ってマッチング確定合図とする
@@ -265,7 +279,7 @@ int main()
 					sprintf_s(toSendText, "%d", 5);
 					for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
 					{
-						send(dstSocket[Cnt], toSendText, strlen(toSendText) + 1, 0);
+						send(dstSocket[Cnt], toSendText, BUFFER_SIZE_STRING, 0);
 					}
 				}
 				// とりあえず待ってみる
@@ -289,8 +303,8 @@ int main()
 				if (ChkMyNumRecv[ConnectCnt] == true) continue;
 				//個人番号合図を送る
 				sprintf_s(toSendText, "MyNum%d", ConnectCnt);
-				send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
-				numrcv = recv(dstSocket[ConnectCnt], MyNumChkRMsg, BUFFER_SIZE, 0);
+				send(dstSocket[ConnectCnt], toSendText, BUFFER_SIZE_STRING, 0);
+				numrcv = recv(dstSocket[ConnectCnt], MyNumChkRMsg, BUFFER_SIZE_STRING, 0);
 				if (numrcv < 1)
 				{
 					if (WSAGetLastError() == WSAEWOULDBLOCK)
@@ -305,7 +319,7 @@ int main()
 				}
 				else
 				{
-					if (strcmp(MyNumChkRMsg, "OK") == 0)
+					if (strcmp(MyNumChkRMsg, "MyNumOK") == 0)
 					{
 						//個人番号を受けっとた合図が返ってきたらここでカウント増やす
 						ChkMyNumRecv[ConnectCnt] = true;
@@ -341,8 +355,8 @@ int main()
 				if (ChkItemRecv[ConnectCnt] == true) continue;
 
 				//アイテム情報メッセージを送る
-				send(dstSocket[ConnectCnt], ItemSMsg, strlen(ItemSMsg) + 1, 0);
-				numrcv = recv(dstSocket[ConnectCnt], ItemChkRMsg, BUFFER_SIZE, 0);
+				send(dstSocket[ConnectCnt], ItemSMsg, BUFFER_SIZE_STRING, 0);
+				numrcv = recv(dstSocket[ConnectCnt], ItemChkRMsg, BUFFER_SIZE_STRING, 0);
 				if (numrcv < 1)
 				{
 					if (WSAGetLastError() == WSAEWOULDBLOCK)
@@ -357,7 +371,7 @@ int main()
 				}
 				else
 				{
-					if (strcmp(ItemChkRMsg, "OK") == 0)
+					if (strcmp(ItemChkRMsg, "ItemOK") == 0)
 					{
 						//個人番号を受けっとた合図が返ってきたらここでカウント増やす
 						ChkItemRecv[ConnectCnt] = true;
@@ -393,8 +407,8 @@ int main()
 				if (ChkStartRecv[ConnectCnt] == true) continue;
 				//個人番号合図を送る
 				sprintf_s(toSendText, "Start");
-				send(dstSocket[ConnectCnt], toSendText, strlen(toSendText) + 1, 0);
-				numrcv = recv(dstSocket[ConnectCnt], CountChkRMsg, BUFFER_SIZE, 0);
+				send(dstSocket[ConnectCnt], toSendText, BUFFER_SIZE_STRING, 0);
+				numrcv = recv(dstSocket[ConnectCnt], CountChkRMsg, BUFFER_SIZE_STRING, 0);
 				if (numrcv < 1)
 				{
 					if (WSAGetLastError() == WSAEWOULDBLOCK)
@@ -409,7 +423,7 @@ int main()
 				}
 				else
 				{
-					if (strcmp(CountChkRMsg, "OK") == 0)
+					if (strcmp(CountChkRMsg, "StartOK") == 0)
 					{
 						//個人番号を受けっとた合図が返ってきたらここでカウント増やす
 						ChkStartRecv[ConnectCnt] = true;
@@ -430,13 +444,13 @@ int main()
 		bool ChkGameEnd = false;
 		while (ChkGameEnd != true)
 		{
-			printf("STEP5 対戦中\n");
+			//printf("STEP5 対戦中\n");
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
 				char GameRMsg[BUFFER_SIZE] = { NULL }; //送られてくるデータ内容
 
 				//メッセージを受け取る
-				numrcv = recv(dstSocket[ConnectCnt], GameRMsg, BUFFER_SIZE, 0);
+				numrcv = recv(dstSocket[ConnectCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
 				//numrcv = -1;
 				if (numrcv < 1)
 				{
@@ -562,12 +576,12 @@ int main()
 
 
 						//アイテム以外のデータが送られてきたら他クライアントにデータを送信
-						else if(strcmp(RMsgBlock, "@P0") == 0|| strcmp(RMsgBlock, "@P1") == 0 || strcmp(RMsgBlock, "@P2") == 0 || strcmp(RMsgBlock, "@P3") == 0)
+						else if (strcmp(RMsgBlock, "@P0") == 0 || strcmp(RMsgBlock, "@P1") == 0 || strcmp(RMsgBlock, "@P2") == 0 || strcmp(RMsgBlock, "@P3") == 0)
 						{
 							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
 							{
 								if (SendCnt == ConnectCnt) continue; //自分には送らなくていい
-								send(dstSocket[SendCnt], GameRMsg, strlen(GameRMsg) + 1, 0);
+								send(dstSocket[SendCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
 							}
 
 							RMsgBlock = strtok_s(NULL, ",", &next);
@@ -614,7 +628,7 @@ int main()
 							//Seed値を同期　この信号を送ることで地形生成を行う
 							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
 							{
-								send(dstSocket[SendCnt], GameRMsg, strlen(GameRMsg) + 1, 0);
+								send(dstSocket[SendCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
 							}
 
 						}
@@ -668,7 +682,7 @@ int main()
 								//リスポーンしたアイテム情報をクライアントに送信
 								for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
 								{
-									send(dstSocket[SendCnt], ItemSMsg, strlen(ItemSMsg) + 1, 0);
+									send(dstSocket[SendCnt], ItemSMsg, BUFFER_SIZE_STRING, 0);
 								}
 								break;
 							}
@@ -678,6 +692,7 @@ int main()
 
 				//マップの更新　サーバーで地形生成をするときに使用
 				//VTXPos　PlayerPos fieldsize itemをとったTikeiItemGetPlayer 
+				/*
 				if (TikeiChange == true)
 				{
 					GenerateFiled(&PlayerPos[0], &VTXPos[0], TikeiItemGetPlayer, &FieldIdx[0], &TikeiChange,&TikeiIdxMsgBuff[0]);
@@ -696,9 +711,10 @@ int main()
 					//データを送信
 					for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
 					{
-						send(dstSocket[SendCnt], NewTikeiMsg, strlen(NewTikeiMsg) + 1, 0);
+						send(dstSocket[SendCnt], NewTikeiMsg, BUFFER_SIZE_STRING, 0);
 					}
 				}
+			*/
 			}
 		}
 		//----------------------------ゲーム中信号
