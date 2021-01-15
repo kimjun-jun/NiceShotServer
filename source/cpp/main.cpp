@@ -204,7 +204,7 @@ int main()
 		bool ChkConnect[CONNECT_MAX] = { false };
 		int ConnectOK = 0;
 		char toSendText[BUFFER_SIZE];
-		bool acceptFlag[CONNECT_MAX] = { false,false };
+		bool acceptFlag[CONNECT_MAX] = { false };
 		while (ChkMatch != true)
 		{
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
