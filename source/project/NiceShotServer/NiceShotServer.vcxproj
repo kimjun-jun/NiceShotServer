@@ -20,7 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\cpp\library.cpp" />
-    <ClCompile Include="..\..\cpp\main.cpp" />
+    <ClCompile Include="..\..\cpp\mainTCP.cpp" />
+    <ClCompile Include="..\..\cpp\mainUDP.cpp" />
     <ClCompile Include="..\..\cpp\vec3.cpp" />
   </ItemGroup>
   <ItemGroup>

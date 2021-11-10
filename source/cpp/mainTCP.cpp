@@ -10,8 +10,8 @@
 #pragma comment (lib, "Ws2_32.lib")
 
 #define BUFFER_SIZE 500					//!< 送信データバッファサイズ
-#define BUFFER_SIZE_STRING 501					//!< 送信データバッファサイズ
-#define CONNECT_MAX 2					//!< クライアント数
+#define BUFFER_SIZE_STRING 500			//!< 送信データバッファサイズ
+#define CONNECT_MAX 3					//!< クライアント数
 
 
 #define DROP_ITEM_MAX 20				//!< 出現させるアイテムの数
@@ -50,6 +50,13 @@ enum
 	ITEMTYPE_KIRI,			// お邪魔アイテム　霧
 	ITEMTYPE_MAX
 };
+
+//WANプロトコルのポート6432
+//ポート開放
+//最大で300バイトくらい
+//sleep無くていい
+//再送制御か照合制御がいる
+//upnpはoffでいい
 
 //STEP1	同端末通信	OK
 //STEP2	LAN通信		OK
@@ -158,6 +165,7 @@ int main()
 
 		/* ソケットの生成 */
 		srcSocket = socket(AF_INET, SOCK_STREAM, 0);
+		//srcSocket = socket(AF_INET, SOCK_DGRAM, 0);
 
 		/* ソケットのバインド */
 		bind(srcSocket, (struct sockaddr *) &srcAddr, sizeof(srcAddr));
@@ -226,6 +234,7 @@ int main()
 						}
 					}
 
+					//対象のソケットからアドレスを抜き出し表示
 					//dstSocket[ConnectCnt] = accept(srcSocket, (struct sockaddr *) &dstAddr, &dstAddrSize);
 					inet_ntop(AF_INET, &dstAddr[ConnectCnt].sin_addr, addr, dstAddrSize);
 					sprintf_s(addr, "%s[%d]", addr, ConnectCnt);
@@ -247,7 +256,7 @@ int main()
 							printf("応答なし : 0x%x\n", WSAGetLastError());
 						}
 					}
-					//正常にreceiveしているとき
+					//正常にreceiveしたとき
 					else
 					{
 						ChkConnect[ConnectCnt] = true;
@@ -277,13 +286,23 @@ int main()
 					ChkMatch = true;
 					printf("マッチング完了\n");
 					sprintf_s(toSendText, "%d", 5);
+					//ここで確認用信号を何回かおくらないと失敗する時がある
 					for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
 					{
 						send(dstSocket[Cnt], toSendText, BUFFER_SIZE_STRING, 0);
 					}
+					for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
+					{
+						send(dstSocket[Cnt], toSendText, BUFFER_SIZE_STRING, 0);
+					}
+					for (int Cnt = 0; Cnt < CONNECT_MAX; Cnt++)
+					{
+						send(dstSocket[Cnt], toSendText, BUFFER_SIZE_STRING, 0);
+					}
+
 				}
 				// とりあえず待ってみる
-				Sleep(100);
+				Sleep(10);
 			}
 		}
 		//----------------------------マッチング信号
@@ -334,13 +353,13 @@ int main()
 					printf("%s\n", MyNumChkRMsg);
 				}
 				// とりあえず待ってみる
-				Sleep(100);
+				Sleep(10);
 			}
 		}
 		//----------------------------個人番号信号
 
 
-		//----------------------------アイテム生成　ステップ3
+		//----------------------------アイテム同期　ステップ3
 		bool ChkItem = false;
 		bool ChkItemRecv[CONNECT_MAX] = { false };
 		int ItemOK = 0;
@@ -386,7 +405,7 @@ int main()
 					printf("%s\n", ItemChkRMsg);
 				}
 				// とりあえず待ってみる
-				Sleep(100);
+				Sleep(10);
 			}
 		}
 		//----------------------------アイテム生成
@@ -574,7 +593,6 @@ int main()
 						}
 						*/
 
-
 						//アイテム以外のデータが送られてきたら他クライアントにデータを送信
 						else if (strcmp(RMsgBlock, "@P0") == 0 || strcmp(RMsgBlock, "@P1") == 0 || strcmp(RMsgBlock, "@P2") == 0 || strcmp(RMsgBlock, "@P3") == 0)
 						{
@@ -587,6 +605,7 @@ int main()
 							RMsgBlock = strtok_s(NULL, ",", &next);
 
 							//Posがある場合　バッファを保存
+							/*
 							if (strcmp(RMsgBlock, "Pos") == 0)
 							{
 								RMsgBlock = strtok_s(NULL, "&", &next);
@@ -620,9 +639,10 @@ int main()
 									}
 								}
 							}
+							*/
 						}
 
-						//アイテム取得のデータが送られてきたらアイテム管理をする
+						//地形アイテム取得のデータが送られてきたらアイテム管理をする
 						else if (strcmp(RMsgBlock, "@T") == 0)
 						{
 							//Seed値を同期　この信号を送ることで地形生成を行う
@@ -633,12 +653,15 @@ int main()
 
 						}
 
-
 						//終了判定
-						if (strcmp(GameRMsgBuff, "EndGame") == 0)
+						if (strcmp(GameRMsgBuff, "@EndGame") == 0)
 						{
+							//最終メッセージを送ってゲームループを終了させる
+							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
+							{
+								send(dstSocket[SendCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
+							}
 							ChkGameEnd = true;
-							break;
 						}
 					}
 

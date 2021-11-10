@@ -21,13 +21,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\cpp\main.cpp">
-      <Filter>cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\cpp\vec3.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\..\cpp\library.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\cpp\mainTCP.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\cpp\mainUDP.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
   </ItemGroup>
