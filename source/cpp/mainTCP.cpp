@@ -11,7 +11,7 @@
 
 #define BUFFER_SIZE 500					//!< 送信データバッファサイズ
 #define BUFFER_SIZE_STRING 500			//!< 送信データバッファサイズ
-#define CONNECT_MAX 3					//!< クライアント数
+#define CONNECT_MAX 2					//!< クライアント数
 
 
 #define DROP_ITEM_MAX 20				//!< 出現させるアイテムの数
@@ -464,15 +464,17 @@ int main()
 		while (ChkGameEnd != true)
 		{
 			//printf("STEP5 対戦中\n");
+			char GameRMsg[BUFFER_SIZE] = { NULL }; //送られてくるデータ内容
 			for (int ConnectCnt = 0; ConnectCnt < CONNECT_MAX; ConnectCnt++)
 			{
-				char GameRMsg[BUFFER_SIZE] = { NULL }; //送られてくるデータ内容
-
+				GameRMsg[0] = NULL;//送られてくるデータ内容
 				//メッセージを受け取る
 				numrcv = recv(dstSocket[ConnectCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
 				//numrcv = -1;
+				/*
 				if (numrcv < 1)
 				{
+					printf("[ %d ][ P%d ]\n", WSAGetLastError(), ConnectCnt);
 					if (WSAGetLastError() == WSAEWOULDBLOCK)
 					{
 						// まだ来ない。
@@ -483,7 +485,8 @@ int main()
 						//printf("error : 0x%x\n", WSAGetLastError());
 					}
 				}
-				else
+				*/
+				if(numrcv >0)
 				{
 					/* スペース.を区切りに文字列を抽出 */
 					if (GameRMsg[0] != NULL)
@@ -500,161 +503,22 @@ int main()
 						{
 							char *ItemMsgBlock = next;
 							char *nextItemMsg = NULL;
-							char *Index;
-							Index = strtok_s(ItemMsgBlock, "N,", &nextItemMsg);
-							char *Type;
-							Type = strtok_s(NULL, "T,", &nextItemMsg);
-
+							char *Index = strtok_s(ItemMsgBlock, "N,", &nextItemMsg);
+							char *Type = strtok_s(NULL, "T,", &nextItemMsg);
 							//"@I,N%d,T%d,X%4.3f,Y%4.3f,Z%4.3f&"
 							RMsgBlock = strtok_s(NULL, "&", &nextItemMsg);
-							VEC3 buff;
-							char *XYZnext = RMsgBlock;
-							for (int CntXYZ = 0; CntXYZ < 3; CntXYZ++)
-							{
-								char *GetVal = NULL;
-								char *SetVal = NULL;
-								char *YZnext = NULL;
-								char *nullp = NULL;
-								//XZの数値部分を取得する
-								GetVal = strtok_s(XYZnext, ",", &XYZnext);
-								if (CntXYZ == 0) SetVal = strtok_s(GetVal, "X", &nullp);//SetVal=000.000 nullp=NULL
-								else if (CntXYZ == 1) SetVal = strtok_s(GetVal, "Y", &nullp);//SetVal=000.000 nullp=NULL
-								else if (CntXYZ == 2) SetVal = strtok_s(GetVal, "Z", &nullp);//SetVal=000.000 nullp=NULL
-								switch (CntXYZ)
-								{
-								case 0:
-									buff.x = strtof(SetVal, NULL);
-									break;
-								case 1:
-									buff.y = strtof(SetVal, NULL);
-									break;
-								case 2:
-									buff.z = strtof(SetVal, NULL);
-									//データを格納
-									int iIndex = atoi(Index);
-									int iType = atoi(Type);
-
-									//地形アイテムだったら新頂点座標を生成　サーバーで地形生成するときはこっち使う
-									/*
-									if (iType == ITEMTYPE_TIKEI)
-									{
-										//アイテムを取得したプレイヤー番号を記憶
-										TikeiChange = true;
-										TikeiItemGetPlayer = ConnectCnt;
-									}
-									*/
-
-									//ゲットされたアイテムをfalseにしてリスポーンカウントアップ開始
-									if (ItemUse[iIndex] != false)
-									{
-										ItemUse[iIndex] = false;
-										ItemCntUse--;
-									}
-
-									if (nextItemMsg[0] != NULL)
-									{
-										ItemMsgBlock = strtok_s(nextItemMsg, "#", &nextItemMsg);
-										strtok_s(ItemMsgBlock, ",", &nextItemMsg);
-										ItemMsgBlock = nextItemMsg;
-									}
-									break;
-								}
-							}
-						}
-
-						//アイテムuse情報
-						/*
-						else if (strcmp(RMsgBlock, "@UI") == 0)
-						{
-							char *ItemMsgBlock = next;
-							char *nextItemMsg = NULL;
-							char *Index;
-							Index = strtok_s(ItemMsgBlock, "N,", &nextItemMsg);
-							char *Type;
-							Type = strtok_s(NULL, "T,", &nextItemMsg);
-
-							//"@UI,N%d,T%d,U%d&"
-							RMsgBlock = strtok_s(NULL, "&", &nextItemMsg);
-							char *Use;
-							Use = strtok_s(RMsgBlock, "U", &nextItemMsg);
 							//データを格納
 							int iIndex = atoi(Index);
-							int iType = atoi(Type);
-							int iUse = atoi(Use);
-							//アイテムuse情報を同期
-							ItemScyncUse[iIndex] = iUse;
-
-							if (nextItemMsg[0] != NULL)
+							int iType = atoi(Type);		//タイプは必要なし
+							//ゲットされたアイテムをfalseにしてリスポーンカウントアップ開始
+							if (ItemUse[iIndex] != false)
 							{
-								ItemMsgBlock = strtok_s(nextItemMsg, "#", &nextItemMsg);
-								strtok_s(ItemMsgBlock, ",", &nextItemMsg);
-								ItemMsgBlock = nextItemMsg;
+								ItemUse[iIndex] = false;
+								ItemCntUse--;
 							}
 						}
-						*/
-
-						//アイテム以外のデータが送られてきたら他クライアントにデータを送信
-						else if (strcmp(RMsgBlock, "@P0") == 0 || strcmp(RMsgBlock, "@P1") == 0 || strcmp(RMsgBlock, "@P2") == 0 || strcmp(RMsgBlock, "@P3") == 0)
-						{
-							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
-							{
-								if (SendCnt == ConnectCnt) continue; //自分には送らなくていい
-								send(dstSocket[SendCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
-							}
-
-							RMsgBlock = strtok_s(NULL, ",", &next);
-
-							//Posがある場合　バッファを保存
-							/*
-							if (strcmp(RMsgBlock, "Pos") == 0)
-							{
-								RMsgBlock = strtok_s(NULL, "&", &next);
-								VEC3 buff;
-								char *XYZnext = RMsgBlock;
-								for (int CntXYZ = 0; CntXYZ < 3; CntXYZ++)
-								{
-									char *GetVal = NULL;
-									char *SetVal = NULL;
-									char *YZnext = NULL;
-									char *nullp = NULL;
-									//XYZの数値部分を取得する
-									GetVal = strtok_s(XYZnext, ",", &XYZnext);//GetVal=X000.000,Y000.000,Z000.000  next=次のRot
-									if (CntXYZ == 0) SetVal = strtok_s(GetVal, "X", &nullp);//SetVal=000.000 nullp=NULL
-									else if (CntXYZ == 1) SetVal = strtok_s(GetVal, "Y", &nullp);//SetVal=000.000 nullp=NULL
-									else if (CntXYZ == 2) SetVal = strtok_s(GetVal, "Z", &nullp);//SetVal=000.000 nullp=NULL
-									switch (CntXYZ)
-									{
-									case 0:
-										buff.x = strtof(SetVal, NULL);
-										break;
-									case 1:
-										buff.y = strtof(SetVal, NULL);
-										break;
-									case 2:
-										buff.z = strtof(SetVal, NULL);
-										//データを格納
-										PlayerPos[ConnectCnt] = buff;
-										if (next[0] != NULL) RMsgBlock = strtok_s(next, "@P0,", &next);
-										break;
-									}
-								}
-							}
-							*/
-						}
-
-						//地形アイテム取得のデータが送られてきたらアイテム管理をする
-						else if (strcmp(RMsgBlock, "@T") == 0)
-						{
-							//Seed値を同期　この信号を送ることで地形生成を行う
-							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
-							{
-								send(dstSocket[SendCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
-							}
-
-						}
-
 						//終了判定
-						if (strcmp(GameRMsgBuff, "@EndGame") == 0)
+						else if (strcmp(GameRMsgBuff, "@EndGame") == 0)
 						{
 							//最終メッセージを送ってゲームループを終了させる
 							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
@@ -663,81 +527,64 @@ int main()
 							}
 							ChkGameEnd = true;
 						}
-					}
 
-				}
-
-				//アイテムの更新
-				//アイテム数が20よりすくなければ時間経過で復活させる
-				if (ItemCntUse < DROP_ITEM_MAX)
-				{
-					ItemRespownTime += 1.0f;
-					//一定時間経過でリスポーンする
-					if (ItemRespownTime >= ITEM_RESPOWNTIMEMAX)
-					{
-						ItemRespownTime = 0.0f;
-
-						VEC3 pos;
-						pos.x = float(rand() % int(WALL_SIZE_X / 4)) + 100.0f;
-						pos.z = float(rand() % int(WALL_SIZE_X / 4)) + 100.0f;
-						int x = rand() % 2;
-						int z = rand() % 2;
-						if (x == 1) pos.x *= -1;
-						if (z == 1) pos.z *= -1;
-
-						int ItemTypeNum = rand() % ITEMTYPE_MAX;
-						//ライフ、カメラ、霧アイテムの時はもう一度抽選
-						if (ItemTypeNum == ITEMTYPE_LIFE && ItemTypeNum == ITEMTYPE_CAMERA && ItemTypeNum == ITEMTYPE_KIRI) ItemTypeNum = rand() % ITEMTYPE_MAX;
-						char NewSMsg[BUFFER_SIZE] = { NULL }; //送るデータ内容　"@Item,%d,%d,X%d,Z%d&"
-
-						for (int CntItem = 0; CntItem <= DROP_ITEM_MAX; CntItem++)
+						//それ以外　playerデータと地形アイテム取得のデータが送られてきたら他クライアントにそのままデータを送信
+						else
 						{
-							//未使用があればtrueにしてリスポーンさせる
-							if (ItemUse[CntItem] == false)
+							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
 							{
-								ItemSMsg[0] = NULL;
-								ItemUse[CntItem] = true;
-								ItemCntUse++;
-								sprintf_s(NewSMsg, "@I,N%d.T%d,X%d,Z%d&"
-									, CntItem, ItemTypeNum, int(pos.x), int(pos.z));
-								sprintf_s(ItemSMsg, "%s%s", ItemSMsg, NewSMsg);
-
-								//リスポーンしたアイテム情報をクライアントに送信
-								for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
-								{
-									send(dstSocket[SendCnt], ItemSMsg, BUFFER_SIZE_STRING, 0);
-								}
-								break;
+								if (SendCnt == ConnectCnt) continue; //自分には送らなくていい
+								send(dstSocket[SendCnt], GameRMsg, BUFFER_SIZE_STRING, 0);
 							}
 						}
 					}
-				}
 
-				//マップの更新　サーバーで地形生成をするときに使用
-				//VTXPos　PlayerPos fieldsize itemをとったTikeiItemGetPlayer 
-				/*
-				if (TikeiChange == true)
+				}
+			}
+			//アイテムの更新
+			//アイテム数が20よりすくなければ時間経過で復活させる
+			if (ItemCntUse < DROP_ITEM_MAX)
+			{
+				ItemRespownTime += 1.0f;
+				//一定時間経過でリスポーンする
+				if (ItemRespownTime >= ITEM_RESPOWNTIMEMAX)
 				{
-					GenerateFiled(&PlayerPos[0], &VTXPos[0], TikeiItemGetPlayer, &FieldIdx[0], &TikeiChange,&TikeiIdxMsgBuff[0]);
+					ItemRespownTime = 0.0f;
 
-					char NewTikeiMsg[BUFFER_SIZE*50] = { NULL }; //新しい地形の頂点座標をメッセージ化したもの
+					VEC3 pos;
+					pos.x = float(rand() % int(WALL_SIZE_X / 4)) + 100.0f;
+					pos.z = float(rand() % int(WALL_SIZE_X / 4)) + 100.0f;
+					int x = rand() % 2;
+					int z = rand() % 2;
+					if (x == 1) pos.x *= -1;
+					if (z == 1) pos.z *= -1;
 
-					//メッセージを短くするため高さ決定回数を/2して、計算などは行わずに変更のあった頂点IndxとY数値をメッセージに入れる
-					for (int nCntVtx = 0; nCntVtx < int(NUM_VERTEX_MAX)/2; nCntVtx++)
+					int ItemTypeNum = rand() % ITEMTYPE_MAX;
+					//ライフ、カメラ、霧アイテムの時はもう一度抽選
+					if (ItemTypeNum == ITEMTYPE_LIFE && ItemTypeNum == ITEMTYPE_CAMERA && ItemTypeNum == ITEMTYPE_KIRI) ItemTypeNum = rand() % ITEMTYPE_MAX;
+					char NewSMsg[BUFFER_SIZE] = { NULL }; //送るデータ内容　"@Item,%d,%d,X%d,Z%d&"
+
+					for (int CntItem = 0; CntItem <= DROP_ITEM_MAX; CntItem++)
 					{
-							char NewSMsg[BUFFER_SIZE] = { NULL }; //送るデータ内容　"@Item,%d,%d,X%d,Z%d&"
-							sprintf_s(NewSMsg, "@T%d,Y%d&\n"
-								, TikeiIdxMsgBuff[nCntVtx],int(VTXPos[TikeiIdxMsgBuff[nCntVtx]].y));
-							sprintf_s(NewTikeiMsg, "%s%s", NewTikeiMsg, NewSMsg);
-					}
+						//未使用があればtrueにしてリスポーンさせる
+						if (ItemUse[CntItem] == false)
+						{
+							ItemSMsg[0] = NULL;
+							ItemUse[CntItem] = true;
+							ItemCntUse++;
+							sprintf_s(NewSMsg, "@I,N%d.T%d,X%d,Z%d&"
+								, CntItem, ItemTypeNum, int(pos.x), int(pos.z));
+							sprintf_s(ItemSMsg, "%s%s", ItemSMsg, NewSMsg);
 
-					//データを送信
-					for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
-					{
-						send(dstSocket[SendCnt], NewTikeiMsg, BUFFER_SIZE_STRING, 0);
+							//リスポーンしたアイテム情報をクライアントに送信
+							for (int SendCnt = 0; SendCnt < CONNECT_MAX; SendCnt++)
+							{
+								send(dstSocket[SendCnt], ItemSMsg, BUFFER_SIZE_STRING, 0);
+							}
+							break;
+						}
 					}
 				}
-			*/
 			}
 		}
 		//----------------------------ゲーム中信号
